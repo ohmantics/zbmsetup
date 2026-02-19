@@ -615,8 +615,11 @@ EOF
 rm -f /etc/apt/sources.list.d/pve-enterprise.list \
       /etc/apt/sources.list.d/ceph.list
 
-# Refresh now that the Proxmox repo is in place
+# Refresh now that the Proxmox repo is in place and bring the base system
+# up to date. The full-upgrade is recommended by the Proxmox wiki before
+# installing any PVE packages (ensures compatible base package versions).
 apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y
 
 # -- Proxmox kernel (must come before proxmox-ve meta-package) ----------------
 # Install the PVE kernel first. proxmox-ve depends on it, and installing it
@@ -660,19 +663,15 @@ apt-get autoremove -y
 apt-get remove -y os-prober 2>/dev/null || true
 
 # -- Proxmox storage config ---------------------------------------------------
-log "Writing Proxmox storage.cfg"
-mkdir -p /etc/pve
-cat > /etc/pve/storage.cfg <<EOF
-dir: local
-    path /var/lib/vz
-    content iso,import,backup,vztmpl
-    shared 0
+# /etc/pve is a FUSE filesystem (pmxcfs) managed by pve-cluster. It does not
+# exist during chroot -- writing here creates a real directory that can
+# interfere with pmxcfs first-boot initialization (including SSL cert
+# generation). Storage is configured post-boot via pvesm instead.
 
-zfspool: local-zfs
-    pool ${POOL_NAME}/data
-    content images,rootdir
-    sparse 1
-EOF
+# -- Directories the Proxmox ISO installer creates but no .deb provides -------
+log "Creating directories missing from chroot install"
+install -d -m 0700 -o www-data -g www-data /var/log/pveproxy
+mkdir -p /var/lib/rrdcached/db
 
 # -- SSH ----------------------------------------------------------------------
 log "Configuring SSH"
@@ -810,7 +809,9 @@ phase7_finalize() {
     echo "  1. Remove the USB/ISO"
     echo "  2. Reboot: reboot"
     echo "  3. ZFSBootMenu will appear -- select '$BE_NAME' to boot"
-    echo "  4. Proxmox web UI: https://${TARGET_HOSTNAME}:8006"
+    echo "  4. Add ZFS storage pool:"
+    echo "     pvesm add zfspool local-zfs -pool ${POOL_NAME}/data -content images,rootdir -sparse 1"
+    echo "  5. Proxmox web UI: https://${TARGET_HOSTNAME}:8006"
     echo "================================================================"
 
     log "Phase 7 complete"
