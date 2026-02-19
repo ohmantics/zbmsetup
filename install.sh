@@ -195,6 +195,22 @@ EOF
     done
     [[ ${#missing[@]} -eq 0 ]] || die "Missing required tools: ${missing[*]}"
 
+    # Check for Secure Boot -- ZBM release EFI binaries are unsigned and UEFI
+    # will silently refuse to execute them when Secure Boot is enabled, falling
+    # through to the next boot entry instead.
+    local sb_var
+    sb_var=$(find /sys/firmware/efi/efivars/ -name 'SecureBoot-*' 2>/dev/null | head -1)
+    if [[ -n "$sb_var" ]]; then
+        # The last byte of the EFI variable is the Secure Boot state (1 = enabled)
+        local sb_state
+        sb_state=$(od -An -t u1 -j4 -N1 "$sb_var" 2>/dev/null | tr -d ' ')
+        if [[ "$sb_state" == "1" ]]; then
+            die "Secure Boot is ENABLED. ZFSBootMenu EFI binaries are unsigned and" \
+                "will not boot. Disable Secure Boot in your UEFI/BIOS settings, then" \
+                "re-run this script."
+        fi
+    fi
+
     # Validate network config
     if [[ "$IP_ADDR" != "dhcp" ]]; then
         [[ -n "$GATEWAY" ]] || die "GATEWAY required when IP_ADDR is not 'dhcp'"
@@ -437,12 +453,17 @@ iface vmbr0 inet static
     fi
 
     # Build ZBM download URL.
-    # Latest: https://get.zfsbootmenu.org/efi  (redirects to latest GitHub release)
-    # Versioned: ZBM_VERSION should be a tag like "v3.0.1" or "3.0.1".
+    # Latest: get.zfsbootmenu.org/efi redirects to the correct GitHub asset.
+    # Versioned: use the GitHub API to resolve the asset URL, because the
+    # release file naming convention changed in v3.1.0 (added a kernel version
+    # suffix like -linux6.12) and may change again.
     local zbm_url
     if [[ -n "$ZBM_VERSION" ]]; then
         local ver="${ZBM_VERSION#v}"  # strip leading 'v' if present
-        zbm_url="https://github.com/zbm-dev/zfsbootmenu/releases/download/v${ver}/zfsbootmenu-release-x86_64-v${ver}.EFI"
+        zbm_url=$(curl -sfL "https://api.github.com/repos/zbm-dev/zfsbootmenu/releases/tags/v${ver}" \
+            | grep -o '"browser_download_url": "[^"]*release-x86_64[^"]*\.EFI"' \
+            | grep -o 'https://[^"]*') \
+            || die "Could not find ZBM v${ver} release EFI asset on GitHub"
     else
         zbm_url="https://get.zfsbootmenu.org/efi"
     fi
@@ -692,6 +713,13 @@ mkdir -p /boot/efi/EFI/ZBM
 
 log "  Downloading ZBM EFI binary"
 curl -fL "${zbm_url}" -o /boot/efi/EFI/ZBM/VMLINUZ.EFI
+
+# Sanity-check: a valid PE/EFI binary starts with the "MZ" DOS header magic.
+# A corrupted download or HTML error page will fail this check.
+if ! head -c2 /boot/efi/EFI/ZBM/VMLINUZ.EFI | grep -q 'MZ'; then
+    die "Downloaded file is not a valid EFI binary (missing MZ header). URL: ${zbm_url}"
+fi
+
 cp /boot/efi/EFI/ZBM/VMLINUZ.EFI /boot/efi/EFI/ZBM/VMLINUZ-BACKUP.EFI
 
 # Unmount before dd-mirroring: writing to an actively mounted FAT partition
