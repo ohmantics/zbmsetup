@@ -9,18 +9,22 @@ On your host machine, edit config.sh accordingly. Then cd into this directory an
 
 From the installer UI, I select "Advanced," then pick the "Terminal UI (Debug)" option. You'll need to hit Ctrl-D a few times until you see the network interfaces obtain addresses and then from the installer's TUI, select "abort." You're then dropped into the Proxmox live environment shell. Do this:
 
-`wget http://<your IP>:8000/zbmsetup/config.sh`
-`wget http://<your IP>:8000/zbmsetup/install.sh`
-`chmod +x config.sh install.sh`
-`./install.sh`
+```
+wget http://<your IP>:8000/zbmsetup/config.sh
+wget http://<your IP>:8000/zbmsetup/install.sh
+chmod +x config.sh install.sh
+./install.sh
+```
 
 ### via Debian 13.3.0 Trixie ISO
 
 From the installer UI, select the "live environment" option. Then run these commands:
 
-`sudo su`
-`cd`
-`curl http://<your IP>:8000/zbmsetup/config.sh`
-`curl http://<your IP>:8000/zbmsetup/install.sh`
-`chmod +x config.sh install.sh`
-`./install.sh`
+```
+sudo su
+cd
+curl http://<your IP>:8000/zbmsetup/config.sh
+curl http://<your IP>:8000/zbmsetup/install.sh
+chmod +x config.sh install.sh
+./install.sh
+```
