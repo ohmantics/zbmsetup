@@ -484,7 +484,7 @@ iface vmbr0 inet static
         # the UEFI menu (Drive1, Drive2, …).  A single-drive install gets no
         # suffix — just "ZFSBootMenu" / "ZFSBootMenu (Backup)".
         [[ $num_drives -gt 1 ]] && label_suffix=" Drive$((i+1))"
-        efi_reg_cmds+="efibootmgr -c -d \"${disk}\" -p 1 -L \"ZFSBootMenu${label_suffix} (Backup)\" -l '\\\\EFI\\\\ZBM\\\\VMLINUZ-BACKUP.EFI'
+        efi_reg_cmds+="efibootmgr -c -d \"${disk}\" -p 1 -L \"ZFSBootMenu${label_suffix} (Backup)\" -l '\\EFI\\ZBM\\VMLINUZ-BACKUP.EFI'
 "
     done
     # Pass 2: primary entries, reverse drive order (drive 0 registered last = boots first)
@@ -492,7 +492,7 @@ iface vmbr0 inet static
         local disk="${DRIVES[$i]}"
         label_suffix=""
         [[ $num_drives -gt 1 ]] && label_suffix=" Drive$((i+1))"
-        efi_reg_cmds+="efibootmgr -c -d \"${disk}\" -p 1 -L \"ZFSBootMenu${label_suffix}\" -l '\\\\EFI\\\\ZBM\\\\VMLINUZ.EFI'
+        efi_reg_cmds+="efibootmgr -c -d \"${disk}\" -p 1 -L \"ZFSBootMenu${label_suffix}\" -l '\\EFI\\ZBM\\VMLINUZ.EFI'
 "
     done
 
